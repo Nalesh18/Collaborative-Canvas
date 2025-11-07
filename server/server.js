@@ -3,20 +3,25 @@ const http = require('http');
 const path = require('path');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
-const { RoomManager } = require('./rooms');
+// Assuming rooms.js is in the same directory
+const { RoomManager } = require('./rooms'); 
 
 const rooms = new RoomManager();
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 
-// Serve the client files
+// Serve the client files (assuming client is one level up, in a 'client' folder)
+// MODIFIED: This path now correctly points to the 'client' directory
 app.use(express.static(path.join(__dirname, '..', 'client')));
 app.get('/_health', (req,res) => res.send('ok'));
 
 // Handle WebSocket upgrades
 server.on('upgrade', (request, socket, head) => {
-  if (request.url === '/ws') {
+  // Simple path check
+  const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+  
+  if (pathname === '/ws') {
     wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request));
   } else {
     socket.destroy();
@@ -37,9 +42,11 @@ function send(ws, type, payload){
 // Map of active clients (ws -> metadata)
 const clients = new Map(); 
 
-function broadcast(type, payload, except = null) {
+// MODIFIED: Broadcast function is now room-aware
+function broadcast(room, type, payload, except = null) {
+  if (!room) return; // Don't broadcast if room is invalid
   for (const [ws, meta] of clients) {
-    if (ws !== except) {
+    if (meta.room === room && ws !== except) {
       send(ws, type, payload);
     }
   }
@@ -47,11 +54,12 @@ function broadcast(type, payload, except = null) {
 
 wss.on('connection', (ws) => {
   const id = uuidv4();
-  clients.set(ws, { id, name: null, color: null });
+  // MODIFIED: Add room property to client metadata
+  clients.set(ws, { id, name: null, color: null, room: null });
   console.log(`Client ${id} connected`);
 
-  // Send history immediately (empty if new)
-  send(ws, 'history', rooms.getHistory('global'));
+  // REMOVED: Don't send history on connect, send it on join
+  // send(ws, 'history', rooms.getHistory('global'));
 
   ws.on('message', (buf) => {
     let msg;
@@ -64,74 +72,102 @@ wss.on('connection', (ws) => {
     if (type === 'join') {
       meta.name = payload.name || `User-${id.slice(0,4)}`;
       meta.color = payload.color || '#e63946';
-      rooms.addPresence('global', meta.id, { id: meta.id, name: meta.name, color: meta.color });
+      // MODIFIED: Set the client's room
+      meta.room = payload.room || 'global';
+      
+      // MODIFIED: Use the client's room
+      rooms.addPresence(meta.room, meta.id, { id: meta.id, name: meta.name, color: meta.color });
+      
+      console.log(`Client ${id} joined room ${meta.room}`);
       
       send(ws, 'joined', { 
         userId: meta.id, 
         name: meta.name, 
         color: meta.color, 
-        users: rooms.listPresence('global'), 
-        state: rooms.getHistory('global') 
+        // MODIFIED: Send users and state for the specific room
+        users: rooms.listPresence(meta.room), 
+        state: rooms.getHistory(meta.room) 
       });
       
-      broadcast('presence', rooms.listPresence('global'));
+      // MODIFIED: Broadcast presence only to the client's room
+      broadcast(meta.room, 'presence', rooms.listPresence(meta.room));
     
     } else if (type === 'op') {
+      // Ensure user is in a room before processing ops
+      if (!meta.room) return;
+      
       const op = payload;
       if (!op) return;
       if (!op.id) op.id = uuidv4();
       if (!op.userId) op.userId = meta.id;
       
       if (op.type === 'stroke-part') {
-        broadcast('op', op, ws); // Send preview to others
+        // MODIFIED: Broadcast preview only to the room
+        broadcast(meta.room, 'op', op, ws); 
       } else {
-        // This includes 'stroke', 'shape', 'clear', and 'clear-user'
-        rooms.pushOp('global', op);
-        broadcast('op', op); // Send finalized op to EVERYONE
+        // This includes 'stroke', 'shape', 'clear-user', 'image', 'text'
+        // MODIFIED: Push op to the correct room
+        rooms.pushOp(meta.room, op);
+        // MODIFIED: Broadcast finalized op only to the room
+        broadcast(meta.room, 'op', op); 
       }
 
     } else if (type === 'undo') {
-      // Find *this user's* last operation
-      const targetId = rooms.findLastActiveOpForUser('global', meta.id);
+      if (!meta.room) return;
+      // MODIFIED: Find op in the correct room
+      const targetId = rooms.findLastActiveOpForUser(meta.room, meta.id);
       if (targetId) {
         const undoOp = { id: uuidv4(), type: 'undo', userId: meta.id, payload: { target: targetId } };
-        rooms.pushOp('global', undoOp);
-        broadcast('op', undoOp);
+        // MODIFIED: Push and broadcast to the correct room
+        rooms.pushOp(meta.room, undoOp);
+        broadcast(meta.room, 'op', undoOp);
       }
     
     } else if (type === 'redo') {
-      // Find *this user's* last undone operation
-      const targetId = rooms.findLastUndoneOpForUser('global', meta.id);
+      if (!meta.room) return;
+      // MODIFIED: Find op in the correct room
+      const targetId = rooms.findLastUndoneOpForUser(meta.room, meta.id);
       if (targetId) {
         const redoOp = { id: uuidv4(), type: 'redo', userId: meta.id, payload: { target: targetId } };
-        rooms.pushOp('global', redoOp);
-        broadcast('op', redoOp);
+        // MODIFIED: Push and broadcast to the correct room
+        rooms.pushOp(meta.room, redoOp);
+        broadcast(meta.room, 'op', redoOp);
       }
     
     } else if (type === 'cursor') {
+      if (!meta.room) return;
       const c = payload; c.userId = meta.id; c.color = meta.color; c.name = meta.name;
-      broadcast('cursor', c, ws);
+      // MODIFIED: Broadcast cursor only to the room
+      broadcast(meta.room, 'cursor', c, ws);
     
     } else if (type === 'ping') {
       send(ws, 'pong', payload);
     
     } else if (type === 'presence') {
+      if (!meta.room) return;
       // Heartbeat presence update
       if (payload.name) meta.name = payload.name;
       if (payload.color) meta.color = payload.color;
-      rooms.addPresence('global', meta.id, { id: meta.id, name: meta.name, color: meta.color });
-      broadcast('presence', rooms.listPresence('global'));
+      // MODIFIED: Update presence in the correct room
+      rooms.addPresence(meta.room, meta.id, { id: meta.id, name: meta.name, color: meta.color });
+      // MODIFIED: Broadcast presence only to the room
+      broadcast(meta.room, 'presence', rooms.listPresence(meta.room));
     }
   });
 
   ws.on('close', () => {
     const meta = clients.get(ws);
-    if (meta) {
-      console.log(`Client ${meta.id} disconnected`);
-      rooms.removePresence('global', meta.id);
+    // MODIFIED: Check if user was in a room before broadcasting
+    if (meta && meta.room) {
+      console.log(`Client ${meta.id} disconnected from room ${meta.room}`);
+      // MODIFIED: Remove presence from the correct room
+      rooms.removePresence(meta.room, meta.id);
+      // MODIFIED: Broadcast presence update only to that room
+      broadcast(meta.room, 'presence', rooms.listPresence(meta.room));
+    } else if (meta) {
+      console.log(`Client ${meta.id} disconnected (was not in a room)`);
     }
     clients.delete(ws);
-    broadcast('presence', rooms.listPresence('global'));
   });
   
   ws.on('error', (err) => {

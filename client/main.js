@@ -1,12 +1,17 @@
 // client/main.js
 const loginModal = document.getElementById('loginModal');
 const usernameInput = document.getElementById('usernameInput');
+// ADDED: Get room input
+const roomNameInput = document.getElementById('roomNameInput');
 const userColorInput = document.getElementById('userColorInput');
 const joinBtn = document.getElementById('joinBtn');
 
 joinBtn.addEventListener('click', () => {
   const name = usernameInput.value.trim() || ('User' + Math.floor(Math.random()*900+100));
-  const color = userColorInput.value || '#e63946';
+  // ADDED: Get room name, default to 'global'
+  const room = roomNameInput.value.trim() || 'global';
+  // MODIFIED: Default color fallback set to black
+  const color = userColorInput.value || '#000000';
   
   // Add class to trigger fade-out animation
   loginModal.classList.add('hidden');
@@ -15,11 +20,19 @@ joinBtn.addEventListener('click', () => {
     loginModal.style.display = 'none';
   }, 300); // Must match animation duration
   
-  window.canvasApp.init({ name, color });
+  // MODIFIED: Pass room to init function
+  window.canvasApp.init({ name, color, room });
 });
 
 // Allow joining with "Enter" key
 usernameInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    joinBtn.click();
+  }
+});
+
+// ADDED: Allow joining with "Enter" key from room input
+roomNameInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     joinBtn.click();
   }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FreeSite-Canvas</title>
+  <title>Collaborative Canvas Dashboard</title>
   
   <!-- Add the futuristic font 'Exo 2' from the dashboard example -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,9 +22,15 @@
       <div class="modal-content">
         <label for="usernameInput">Display Name</label>
         <input id="usernameInput" type="text" placeholder="Enter name" />
+        
+        <!-- ADDED: Room Name Input -->
+        <label for="roomNameInput">Room Name</label>
+        <input id="roomNameInput" type="text" placeholder="Enter room name (e.g., 'global')" />
+        
         <label for="userColorInput">Select Color</label>
         <div class="modal-actions">
-          <input id="userColorInput" type="color" value="#00cfff" />
+          <!-- MODIFIED: Default color set to black -->
+          <input id="userColorInput" type="color" value="#000000" />
           <button id="joinBtn" class="tool-btn active">Join</button>
         </div>
       </div>
@@ -40,9 +46,20 @@
   <div class="dashboard-container">
     <header class="dashboard-header">
       <h1 class="dashboard-title">COLLABORATIVE CANVAS</h1>
-      <div class="dashboard-stats">
-          <div>FPS: <span id="fps">—</span></div>
-          <div id="latency">Ping: — ms</div>
+      
+      <!-- MODIFIED: Wrapped controls for better layout -->
+      <div class="dashboard-controls">
+        <!-- ADDED: Theme toggle switch -->
+        <div class="theme-switch-wrapper">
+          <label class="theme-switch" for="themeToggle" title="Toggle Bright/Dark Mode">
+            <input type="checkbox" id="themeToggle" />
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <div class="dashboard-stats">
+            <div>FPS: <span id="fps">—</span></div>
+            <div id="latency">Ping: — ms</div>
+        </div>
       </div>
     </header>
 
@@ -73,7 +90,8 @@
       <div class="tool-group">
         <label class="tool-label">Brush</label>
         <input id="size" type="range" min="1" max="48" value="4" title="Brush Size" />
-        <input id="colorPicker" type="color" value="#00cfff" title="Color Picker" />
+        <!-- MODIFIED: Default color (for dark mode) is now black -->
+        <input id="colorPicker" type="color" value="#000000" title="Color Picker" />
       </div>
       
       <div class="tool-group tool-group-right">

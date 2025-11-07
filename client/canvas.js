@@ -6,6 +6,9 @@ const usersList = document.getElementById('usersList');
 const fpsEl = document.getElementById('fps');
 const latencyEl = document.getElementById('latency');
 
+// ADDED: Theme toggle
+const themeToggle = document.getElementById('themeToggle');
+
 const sizeInput = document.getElementById('size');
 const colorPicker = document.getElementById('colorPicker');
 const brushBtn = document.getElementById('brushBtn');
@@ -31,7 +34,8 @@ const buffer = document.createElement('canvas');
 const bufferCtx = buffer.getContext('2d');
 
 let username = null;
-let userColor = '#e63946';
+// MODIFIED: Default userColor set to black
+let userColor = '#000000';
 let userId = null;
 let tool = 'brush';
 let size = Number(sizeInput.value);
@@ -43,15 +47,26 @@ let history = [];
 let cursors = {};
 const seenOpIds = new Set();
 
+// ADDED: Global for room name
+let roomName = 'global';
+
 // ADDED: Globals for new tools
 let pendingImage = null; // Stores loaded Image object for placement
 let pendingImageDataUrl = null; // Stores dataURL to send in op
-let currentTextInput = null; // Stores {input, x, y} for live text
+let currentTextInput = null; // Stores {input, x, y, w, h, color, size} for live text
 let imageCache = {}; // Caches Image objects from dataURLs {src: Image}
 
-// ADDED: A helper for the eraser cursor
+// MODIFIED: A helper for the eraser cursor
 let eraserCursorSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='${24}' height='${24}' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><circle cx='12' cy='12' r='10'/></svg>`;
 let eraserCursorDataUrl = `data:image/svg+xml;charset=utf8,${encodeURIComponent(eraserCursorSvg)}`;
+
+// MODIFIED: SVG cursors for text and image
+let textCursorDataUrl = '';
+let imageCursorDataUrl = '';
+let brushCursorDataUrl = '';
+
+// ADDED: Global for theme-based cursor color
+let cursorColor = '#000000'; // Default to black for dark mode
 
 
 let frames = 0, lastFpsTs = performance.now();
@@ -88,8 +103,11 @@ function resizeCanvases(){
     overlayCtx.setTransform(dpr,0,0,dpr,0,0);
     bufferCtx.setTransform(dpr,0,0,dpr,0,0);
     
-    // ADDED: Update eraser cursor size on resize
+    // ADDED: Update all cursor sizes/colors on resize
+    updateBrushCursor();
     updateEraserCursor();
+    updateTextCursor();
+    updateImageCursor();
     rebuildBufferFromHistory();
   }
 }
@@ -140,15 +158,21 @@ function drawShapeOn(ctx, op){
   ctx.restore();
 }
 
-// ADDED: Function to draw text
+// MODIFIED: Function to draw text
 function drawTextOn(ctx, op) {
   if (!op || !op.payload) return;
   const p = op.payload;
   ctx.save();
   ctx.fillStyle = p.color;
   // Scale font size based on the 'size' slider
+  // This was the bug: it needs to use p.size
   const fontSize = (p.size * 1) + 12; // e.g., size 4 -> 16px, size 48 -> 60px
-  ctx.font = `${fontSize}px var(--font-sans)`;
+  
+  // --- FIX ---
+  // The canvas context can't read CSS variables like 'var(--font-sans)'.
+  // We must provide the actual font family name from style.css.
+  ctx.font = `${fontSize}px 'Exo 2', sans-serif`;
+  
   ctx.textBaseline = 'top';
   
   // Text wrapping logic
@@ -259,44 +283,34 @@ function redrawOverlayPreview(){
     const tempOp = { payload: { points: pts, color: color, size: size, tool: tool } };
     drawStrokeOn(overlayCtx, tempOp); 
   }
-  if (drawing && shapeStart && (tool === 'rect' || tool === 'circle' || tool === 'line')) {
-    const last = pts.length ? pts[pts.length-1] : null;
-    if (last) {
-      const op = { payload: { shape: { type: tool, x1: shapeStart.x, y1: shapeStart.y, x2: last.x, y2: last.y }, color, size } };
-      drawShapeOn(overlayCtx, op);
-    }
-  }
   
-  // MODIFIED: Draw image placement preview (now a rect)
-  if (drawing && tool === 'image' && pendingImage && shapeStart) {
+  // MODIFIED: Draw shape/text/image box previews
+  if (drawing && shapeStart && (tool === 'rect' || tool === 'circle' || tool === 'line' || tool === 'text' || tool === 'image')) {
     const last = pts.length ? pts[pts.length-1] : null;
     if (last) {
-      overlayCtx.save();
       const x = Math.min(shapeStart.x, last.x), y = Math.min(shapeStart.y, last.y);
       const w = Math.abs(last.x - shapeStart.x), h = Math.abs(last.y - shapeStart.y);
       
-      overlayCtx.globalAlpha = 0.6;
-      overlayCtx.drawImage(pendingImage, x, y, w, h);
-      overlayCtx.globalAlpha = 1.0;
-      // Draw a border
-      overlayCtx.strokeStyle = 'rgba(0, 207, 255, 0.8)';
-      overlayCtx.lineWidth = 2;
-      overlayCtx.strokeRect(x, y, w, h);
-      overlayCtx.restore();
-    }
-  }
-
-  // ADDED: Draw text box placement preview
-  if (drawing && tool === 'text' && shapeStart) {
-    const last = pts.length ? pts[pts.length-1] : null;
-    if (last) {
       overlayCtx.save();
-      const x = Math.min(shapeStart.x, last.x), y = Math.min(shapeStart.y, last.y);
-      const w = Math.abs(last.x - shapeStart.x), h = Math.abs(last.y - shapeStart.y);
-      overlayCtx.strokeStyle = 'rgba(0, 207, 255, 0.8)';
-      overlayCtx.setLineDash([5, 5]);
-      overlayCtx.strokeRect(x, y, w, h);
-      overlayCtx.setLineDash([]);
+      
+      if (tool === 'image' && pendingImage) {
+        // Image preview
+        overlayCtx.globalAlpha = 0.6;
+        overlayCtx.drawImage(pendingImage, x, y, w, h);
+        overlayCtx.globalAlpha = 1.0;
+        overlayCtx.strokeStyle = 'rgba(0, 207, 255, 0.8)';
+        overlayCtx.lineWidth = 2;
+        overlayCtx.strokeRect(x, y, w, h);
+      } else if (tool === 'text') {
+        // Text box preview
+        overlayCtx.strokeStyle = 'rgba(0, 207, 255, 0.8)';
+        overlayCtx.setLineDash([5, 5]);
+        overlayCtx.strokeRect(x, y, w, h);
+      } else if (tool !== 'image') {
+        // Shape preview
+        const op = { payload: { shape: { type: tool, x1: shapeStart.x, y1: shapeStart.y, x2: last.x, y2: last.y }, color, size } };
+        drawShapeOn(overlayCtx, op);
+      }
       overlayCtx.restore();
     }
   }
@@ -311,9 +325,10 @@ function redrawOverlayPreview(){
     overlayCtx.fillStyle = c.color || '#222';
     overlayCtx.arc(c.x, c.y, 6, 0, Math.PI*2);
     overlayCtx.fill();
-    overlayCtx.fillStyle = c.color || '#222'; // Text color matches cursor
-    overlayCtx.font = 'bold 12px var(--font-sans)';
-    overlayCtx.fillText(c.name || id.slice(0,4), c.x + 10, c.y + 4);
+    // MODIFIED: Use theme-based cursorColor for text
+    overlayCtx.fillStyle = cursorColor; 
+    overlayCtx.font = 'bold 12px "Exo 2", sans-serif';
+    overlayCtx.fillText(c.name || id.slice(0,4), c.x + 10, c.y + 5);
     overlayCtx.restore();
   }
   
@@ -360,7 +375,8 @@ const sendPreview = throttle((points) => {
 function onTextAreaSubmit() {
   if (!currentTextInput) return;
   
-  const { input, x, y, width, height } = currentTextInput;
+  // MODIFICATION: Get color and size from the stored object
+  const { input, x, y, width, height, color, size } = currentTextInput;
   const text = input.value;
   input.remove(); // Remove from DOM
   currentTextInput = null;
@@ -372,7 +388,8 @@ function onTextAreaSubmit() {
       id: generateId(), 
       type: 'text', 
       userId, 
-      payload: { text: text.trim(), x, y, width, height, color, size } 
+      // MODIFICATION: Use the color and size captured at creation
+      payload: { text: text.trim(), x, y, width, height, color: color, size: size } 
     };
     history.push(op); 
     seenOpIds.add(op.id);
@@ -437,8 +454,8 @@ function pointerMove(ev) {
     return; // Don't do drawing logic if not drawing
   }
   
-  // Store cursor point for image preview
-  if (tool === 'image') {
+  // Store cursor point for image/text preview
+  if (tool === 'image' || tool === 'text') {
     pts = [p]; // Just store the last point
   }
   
@@ -520,7 +537,8 @@ function pointerUp(ev) {
       textarea.focus();
       
       // Store reference
-      currentTextInput = { input: textarea, x, y, width: w, height: h }; // Store unscaled coords for op
+      // MODIFICATION: Store size and color at creation time
+      currentTextInput = { input: textarea, x, y, width: w, height: h, color: color, size: size };
       
       textarea.addEventListener('blur', onTextAreaSubmit);
       textarea.addEventListener('keydown', (e) => {
@@ -658,6 +676,27 @@ function handleImageUpload(e) {
   e.target.value = null;
 }
 
+// ADDED: Helper to update brush cursor SVG
+function updateBrushCursor() {
+    const brushCursorSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='${cursorColor}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 3l4 4L12 18H8v-4L17 3z'/><path d='m16 4 4 4'/></svg>`;
+    brushCursorDataUrl = `data:image/svg+xml;charset=utf8,${encodeURIComponent(brushCursorSvg)}`;
+    
+    if (tool === 'brush') {
+        baseCanvas.style.cursor = `url("${brushCursorDataUrl}") 0 24, crosshair`;
+    }
+}
+
+// ADDED: Helper to update image cursor SVG
+function updateImageCursor() {
+    const imageCursorSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='${cursorColor}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='5' x2='12' y2='19'></line><line x1='5' y1='12' x2='19' y2='12'></line></svg>`;
+    imageCursorDataUrl = `data:image/svg+xml;charset=utf8,${encodeURIComponent(imageCursorSvg)}`;
+    
+    if (tool === 'image') {
+        baseCanvas.style.cursor = `url("${imageCursorDataUrl}") 12 12, crosshair`;
+    }
+}
+
+
 // ADDED: Helper to update eraser cursor SVG
 function updateEraserCursor() {
     // Scale cursor size based on slider, but with min/max caps
@@ -665,13 +704,86 @@ function updateEraserCursor() {
     const center = cursorSize / 2;
     const radius = (cursorSize / 2) - 1;
 
-    eraserCursorSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='${cursorSize}' height='${cursorSize}' viewBox='0 0 ${cursorSize} ${cursorSize}' fill='none' stroke='black' stroke-width='2'><circle cx='${center}' cy='${center}' r='${radius}'/></svg>`;
+    // MODIFIED: Use theme-based cursorColor
+    eraserCursorSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='${cursorSize}' height='${cursorSize}' viewBox='0 0 ${cursorSize} ${cursorSize}' fill='none' stroke='${cursorColor}' stroke-width='2'><circle cx='${center}' cy='${center}' r='${radius}'/></svg>`;
     eraserCursorDataUrl = `data:image/svg+xml;charset=utf8,${encodeURIComponent(eraserCursorSvg)}`;
     
     // Update cursor if eraser is active
     if (tool === 'eraser') {
         baseCanvas.style.cursor = `url("${eraserCursorDataUrl}") ${center} ${center}, crosshair`;
     }
+}
+
+// ADDED: Helper to update text cursor SVG
+function updateTextCursor() {
+    // MODIFIED: Use theme-based cursorColor
+    const textCursorSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='${cursorColor}'><path d='M13 5h-2v14h2V5zM11 3H5v2h6V3zM19 3h-6v2h6V3zM11 21H5v-2h6v2zM19 21h-6v-2h6v2z'/></svg>`;
+    textCursorDataUrl = `data:image/svg+xml;charset=utf8,${encodeURIComponent(textCursorSvg)}`;
+    
+    // Update cursor if text tool is active
+    if (tool === 'text') {
+        baseCanvas.style.cursor = `url("${textCursorDataUrl}") 12 12, text`;
+    }
+}
+
+// ADDED: Function to set the theme
+/**
+ * Sets the color theme for the UI
+ * @param {'bright' | 'dark'} theme - The theme to set
+ * @param {boolean} updatePicker - Whether to update the color picker default
+ */
+function setTheme(theme, updatePicker = false) {
+  if (theme === 'bright') {
+    document.body.classList.add('bright-mode');
+    localStorage.setItem('canvas-theme', 'bright');
+    cursorColor = '#ffffff'; // MODIFIED: Bright mode cursor is WHITE
+    if (updatePicker) {
+      // MODIFIED: Bright mode default is RED
+      colorPicker.value = '#FF4136'; // Red for bright
+      color = colorPicker.value;
+    }
+  } else { // default to dark
+    document.body.classList.remove('bright-mode');
+    localStorage.setItem('canvas-theme', 'dark');
+    cursorColor = '#000000'; // MODIFIED: Dark mode cursor is BLACK
+    if (updatePicker) {
+      // MODIFIED: Dark mode default is BLACK
+      colorPicker.value = '#000000'; // Black for dark
+      color = colorPicker.value;
+    }
+  }
+  
+  // MODIFIED: Update all cursors and re-apply active tool cursor
+  updateBrushCursor();
+  updateEraserCursor();
+  updateTextCursor();
+  updateImageCursor();
+  setTool(tool, true); // Pass a flag to force re-applying the cursor
+}
+
+// ADDED: Function to load and apply the saved theme
+function initializeTheme() {
+  const savedTheme = localStorage.getItem('canvas-theme') || 'dark'; // Dark is default
+  const isBright = savedTheme === 'bright';
+  
+  if (themeToggle) { // Ensure toggle exists
+    themeToggle.checked = isBright;
+  }
+  
+  // Set the theme class on load
+  setTheme(savedTheme, false); 
+  
+  // Set the color picker's default based on the loaded theme
+  if (isBright) {
+    // MODIFIED: Bright mode default is RED
+    colorPicker.value = '#FF4136'; // Red for bright mode
+  } else {
+    // MODIFIED: Dark mode default is BLACK
+    colorPicker.value = '#000000'; // Black for dark mode
+  }
+  
+  // Sync the internal color variable
+  color = colorPicker.value;
 }
 
 
@@ -698,7 +810,11 @@ function attachHandlers(){
     // ADDED: Update eraser cursor on size change
     updateEraserCursor();
   });
-  colorPicker.addEventListener('input', ()=> color = colorPicker.value);
+  colorPicker.addEventListener('input', ()=> {
+    color = colorPicker.value;
+    // REMOVED: Text cursor is now theme-based
+    // updateTextCursor();
+  });
   brushBtn.addEventListener('click', ()=> setTool('brush'));
   eraserBtn.addEventListener('click', ()=> setTool('eraser'));
   rectBtn.addEventListener('click', ()=> setTool('rect'));
@@ -716,8 +832,16 @@ function attachHandlers(){
   
   // ADDED: New tool handlers
   textBtn.addEventListener('click', () => setTool('text'));
-  imageBtn.addEventListener('click', () => imageInput.click()); // Open file dialog
+  imageBtn.addEventListener('click', () => {
+    // MODIFIED: Always trigger click, setTool will handle logic
+    imageInput.click();
+  });
   imageInput.addEventListener('change', handleImageUpload);
+  
+  // ADDED: Theme toggle listener
+  themeToggle.addEventListener('change', () => {
+    setTheme(themeToggle.checked ? 'bright' : 'dark', true); // Update picker on toggle
+  });
 }
 
 // --- WebSocket Handlers ---
@@ -727,6 +851,10 @@ net.on('joined', (payload) => {
   window.canvasApp.userId = userId; // Expose userId
   username = payload.name || username;
   userColor = payload.color || userColor;
+  
+  // ADDED: Clear cursors when joining a new room
+  cursors = {};
+  
   if (payload.state) { 
     history = payload.state.slice(); 
     history.forEach(op => {
@@ -799,7 +927,11 @@ net.on('pong', (t) => { const r = Date.now() - t; latencyEl.textContent = `Ping:
 
 
 // --- App Initialization ---
-function setTool(t){
+// MODIFIED: Added forceUpdate flag
+function setTool(t, forceUpdate = false){
+  // ADDED: Prevent recursion if tool is already active
+  if (t === tool && !forceUpdate) return;
+  
   // If switching away from text tool, submit any active text
   if (tool === 'text' && t !== 'text' && currentTextInput) {
     currentTextInput.input.blur();
@@ -823,16 +955,20 @@ function setTool(t){
   
   const activeBtn = [brushBtn, eraserBtn, rectBtn, circleBtn, lineBtn, textBtn, imageBtn].find(b => b.id.startsWith(t));
   if (activeBtn) activeBtn.classList.add('active');
+
   // MODIFIED: Set cursor style based on tool
   if (t === 'brush') {
-    baseCanvas.style.cursor = "url(\"data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3l4 4L12 18H8v-4L17 3z'/%3E%3Cpath d='m16 4 4 4'/%3E%3C/svg%3E\") 0 24, crosshair";
+    // MODIFIED: Use dynamic cursor
+    baseCanvas.style.cursor = `url("${brushCursorDataUrl}") 0 24, crosshair`;
   } else if (t === 'eraser') {
     // Use the dynamic eraser cursor
     updateEraserCursor();
   } else if (t === 'image') {
-     baseCanvas.style.cursor = 'crosshair'; // Switched to crosshair for drawing box
+     // MODIFIED: Use dynamic cursor
+     baseCanvas.style.cursor = `url("${imageCursorDataUrl}") 12 12, crosshair`;
   } else if (t === 'text') {
-     baseCanvas.style.cursor = 'text'; // Use text cursor for drawing box
+     // MODIFIED: Use dynamic cursor
+     updateTextCursor();
   } else {
     baseCanvas.style.cursor = 'crosshair';
   }
@@ -840,10 +976,21 @@ function setTool(t){
 
 window.canvasApp = {
   init: (opts) => {
-    username = opts.name; userColor = opts.color || userColor;
-    net.send('join', { name: username, color: userColor });
-    attachHandlers();
-    setTool('brush'); // Set initial cursor
+    username = opts.name; 
+    userColor = opts.color || userColor;
+    // ADDED: Set room name
+    roomName = opts.room || 'global';
+
+    // MODIFIED: Initialize theme and set default color *before* anything else
+    initializeTheme(); 
+    
+    // MODIFIED: Send room name to server
+    net.send('join', { name: username, color: userColor, room: roomName });
+    attachHandlers(); // This will now attach the toggle listener
+    
+    // REMOVED: Redundant setTool and cursor updates.
+    // initializeTheme() -> setTheme() -> setTool(tool, true) handles all of it.
+    
     setTimeout(resizeCanvases, 60);
     requestAnimationFrame(redrawOverlayPreview);
   },
