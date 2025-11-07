@@ -1,7 +1,7 @@
 /*
-  RE-WRITE:
-  This CSS is rewritten from scratch to match the futuristic
-  dashboard theme from 'image_7556fc.png'.
+  This CSS file controls the scalable (responsive) layout.
+  See the "--- Responsive ---" section at the bottom for
+  the @media queries that handle different screen sizes.
 */
 
 :root {
@@ -34,14 +34,14 @@ body {
   font-family: var(--font-sans);
   color: var(--text-primary);
   background-color: var(--bg-color);
-  overflow: hidden;
+  overflow: hidden; /* Prevents body scrolling, elements scroll internally */
 }
 
 /* --- Dashboard Layout --- */
 .dashboard-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100vh; /* Full viewport height */
   padding: 1rem;
   gap: 1rem;
 }
@@ -116,6 +116,7 @@ body {
 .modal-card {
   width: 100%;
   max-width: 400px;
+  margin: 1rem; /* Add margin for small screens */
 }
 
 .modal-content {
@@ -156,7 +157,7 @@ body {
 .toolbar {
   flex-shrink: 0;
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: wrap; /* Allows tools to wrap on small screens */
   align-items: center;
   gap: 1.5rem;
   padding: 0.75rem 1rem; /* Tighter padding for toolbar */
@@ -365,8 +366,11 @@ input[type="color"]::-webkit-color-swatch {
   to { opacity: 0; transform: translateX(-10px); }
 }
 
-/* --- Responsive --- */
+/* --- Responsive ---
+  This is the "scalable" part!
+*/
 @media (max-width: 1024px) {
+  /* For tablets */
   .dashboard-container {
     padding: 0.5rem;
     gap: 0.5rem;
@@ -380,9 +384,19 @@ input[type="color"]::-webkit-color-swatch {
   .tool-group {
     gap: 0.5rem;
   }
+  .tool-label {
+    display: none; /* Hide labels on smaller screens to save space */
+  }
 }
 
 @media (max-width: 768px) {
+  /* For mobile phones */
+  body {
+    overflow: auto; /* Allow body to scroll on mobile */
+  }
+  .dashboard-container {
+    height: auto; /* Let content define height */
+  }
   .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
@@ -395,11 +409,20 @@ input[type="color"]::-webkit-color-swatch {
   .tool-group-right {
     margin-left: 0;
   }
+  .toolbar {
+    /* Make toolbar scrollable horizontally if it overflows */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
   .main-grid {
     grid-template-columns: 1fr; /* Stack canvas and users */
-    grid-template-rows: 1fr auto; /* Canvas fills, users auto */
+    grid-template-rows: 50vh auto; /* Canvas is 50% of viewport, users auto */
   }
   #users-panel {
     max-height: 200px; /* Limit user list height */
+  }
+  #canvas-panel {
+    min-height: 400px; /* Ensure canvas has a minimum size */
   }
 }

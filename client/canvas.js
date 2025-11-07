@@ -44,7 +44,7 @@ const seenOpIds = new Set();
 
 let frames = 0, lastFpsTs = performance.now();
 
-// --- Helper Functions (Unchanged) ---
+// --- Helper Functions ---
 
 function throttle(fn, wait) {
   let last = 0;
@@ -54,11 +54,17 @@ function throttle(fn, wait) {
   };
 }
 
+// This function is key for responsive canvas
 function resizeCanvases(){
   dpr = window.devicePixelRatio || 1;
   
   const width = baseCanvas.clientWidth;
   const height = baseCanvas.clientHeight;
+  
+  if (width === 0 || height === 0) {
+    // Canvas is not visible, don't resize
+    return;
+  }
   
   const w = Math.floor(width * dpr);
   const h = Math.floor(height * dpr);
@@ -73,19 +79,16 @@ function resizeCanvases(){
     // Only apply the DPR transform to the "live" contexts
     // (overlay and buffer) where drawing actually happens.
     //
-    // baseCtx.setTransform(dpr,0,0,dpr,0,0); // <-- This line is correctly REMOVED.
     overlayCtx.setTransform(dpr,0,0,dpr,0,0);
     bufferCtx.setTransform(dpr,0,0,dpr,0,0);
     
     // The baseCtx remains 1:1. It is just a "copy" target.
-    // This mismatch is what caused the "jump".
-    // Now, drawImage(buffer, 0, 0) works correctly.
     
     rebuildBufferFromHistory();
   }
 }
 
-// --- Drawing Functions (Unchanged) ---
+// --- Drawing Functions ---
 
 function drawStrokeOn(ctx, op){
   if (!op || !op.payload || !op.payload.points) return;
@@ -178,7 +181,6 @@ function rebuildBufferFromHistory(){
   
   // CRITICAL BUG FIX:
   // Copy from the transformed buffer to the 1:1 base canvas.
-  // This now works correctly.
   baseCtx.clearRect(0,0, baseCanvas.width, baseCanvas.height);
   baseCtx.drawImage(buffer, 0, 0);
 }
@@ -219,13 +221,15 @@ function redrawOverlayPreview(){
   requestAnimationFrame(redrawOverlayPreview);
 }
 
-// --- Pointer/Event Handlers (Unchanged) ---
+// --- Pointer/Event Handlers ---
 
 function pointerToLocal(ev){
+  // ev.offsetX is the most direct way
   if (ev.offsetX !== undefined) {
     return { x: ev.offsetX, y: ev.offsetY };
   } 
   
+  // Fallback for touch or browsers without offsetX
   const rect = baseCanvas.getBoundingClientRect();
   const computedStyle = getComputedStyle(baseCanvas);
   const borderLeft = parseFloat(computedStyle.borderLeftWidth) || 0;
@@ -250,7 +254,7 @@ const sendPreview = throttle((points) => {
 
 function pointerDown(ev) {
   if (!userId) return;
-  if (ev.button > 0) return;
+  if (ev.button > 0) return; // Ignore right-click
   ev.preventDefault();
   drawing = true; pts = [];
   const p = pointerToLocal(ev);
@@ -353,13 +357,10 @@ function updateUsers(list){
     if (!li) {
       li = document.createElement('li');
       li.dataset.userId = u.id;
-      // const dot = document.createElement('span'); dot.className = 'users-dot';
-      // li.appendChild(dot);
       const txt = document.createElement('span'); 
       li.appendChild(txt);
       usersList.appendChild(li);
     }
-    // li.querySelector('.users-dot').style.background = u.color || '#444';
     li.style.borderColor = u.color || '#444'; // Use border color from new CSS
     li.querySelector('span:last-child').textContent = `${u.name}${u.id === userId ? ' (You)' : ''}`;
   });
@@ -377,6 +378,7 @@ function attachHandlers(){
     net.send('cursor', { x: -1, y: -1 }); 
   });
 
+  // This is the other key for scalable/responsive design
   window.addEventListener('resize', resizeCanvases);
 
   sizeInput.addEventListener('input', ()=> size = Number(sizeInput.value));
@@ -398,13 +400,15 @@ function attachHandlers(){
   });
 }
 
-// --- WebSocket Handlers (Unchanged) ---
+// --- WebSocket Handlers ---
 net.on('open', ()=> {});
 net.on('joined', (payload) => {
   userId = payload.userId;
   username = payload.name || username;
   userColor = payload.color || userColor;
-  if (payload.state) { history = payload.state.slice(); history.forEach(op=> op.id && seenOpIds.add(op.id)); rebuildBufferFromHistory(); }
+  if (payload.state) { history = payload.state.slice(); history.forEach(op=> op.id && seenOpIds.add(op.id)); }
+  // We must resize *after* we have history, so it redraws
+  resizeCanvases();
   updateUsers(payload.users || []);
 });
 net.on('op', (op) => {
@@ -435,17 +439,16 @@ net.on('cursor', (c) => {
     delete cursors[c.userId];
     return;
   }
-  cursors[c.userId] = { x:c.x, y:c.y, color:c.color, name:c.name, _ts: Date.now() };
+  cursors[c.userId] = { x:c.x, y:c.y, color:c.color, name:c.name, _ts: Date.w.now() };
   setTimeout(()=> { const cur = cursors[c.userId]; if (cur && Date.now() - cur._ts > 5000) delete cursors[c.userId]; }, 7000);
 });
 net.on('pong', (t) => { const r = Date.now() - t; latencyEl.textContent = `Ping: ${r} ms`; });
 
-// --- App Initialization (Unchanged) ---
+// --- App Initialization ---
 function setTool(t){
   tool = t;
   [brushBtn, eraserBtn, rectBtn, circleBtn, lineBtn].forEach(b => b.classList.toggle('active', false));
   
-  // This logic works perfectly with the new text buttons
   const activeBtn = [brushBtn, eraserBtn, rectBtn, circleBtn, lineBtn].find(b => b.id.startsWith(t));
   if (activeBtn) activeBtn.classList.add('active');
 }
@@ -455,6 +458,7 @@ window.canvasApp = {
     username = opts.name; userColor = opts.color || userColor;
     net.send('join', { name: username, color: userColor });
     attachHandlers();
+    // Delay initial resize to allow layout to settle
     setTimeout(resizeCanvases, 60);
     requestAnimationFrame(redrawOverlayPreview);
   }
