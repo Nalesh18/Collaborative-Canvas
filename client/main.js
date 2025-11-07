@@ -1,5 +1,4 @@
 // client/main.js
-// This file is correct and the typo 'Date.Nopw' is already fixed.
 const loginModal = document.getElementById('loginModal');
 const usernameInput = document.getElementById('usernameInput');
 const userColorInput = document.getElementById('userColorInput');
@@ -29,17 +28,23 @@ usernameInput.addEventListener('keypress', (e) => {
 // ping loop
 setInterval(()=> { 
   if (window.net && window.canvasApp.userId) {
-    // --- FIX: Corrected typo from Date.Nopw() to Date.now() --- (This was already fixed in your file)
     net.send('ping', Date.now()); 
   }
 }, 2000);
 
 // presence
 setInterval(()=> {
-  const name = usernameInput.value.trim();
-  const color = userColorInput.value;
-  // Send presence updates even if not changed, acts as a heartbeat
-  if (window.net && window.canvasApp.userId) { // Only send if joined
+  // Only send if joined
+  if (window.net && window.canvasApp.userId) {
+    const name = usernameInput.value.trim();
+    
+    // MODIFIED: Get the *live* brush color from canvas.js if app is running
+    let color = userColorInput.value; // Default to modal color
+    if (window.canvasApp && typeof window.canvasApp.getCurrentColor === 'function') {
+      color = window.canvasApp.getCurrentColor();
+    }
+    
+    // Send presence updates even if not changed, acts as a heartbeat
      net.send('presence', { name, color });
   }
-}, 3000);
+}, 3000); // This interval now updates the user's cursor color

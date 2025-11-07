@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <!-- This 'viewport' tag is a key part of scalable design! -->
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Collaborative Canvas Dashboard</title>
+  <title>FreeSite-Canvas</title>
   
+  <!-- Add the futuristic font 'Exo 2' from the dashboard example -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -52,6 +52,9 @@
         <label class="tool-label">Tools</label>
         <button id="brushBtn" class="tool-btn active" title="Brush">Brush</button>
         <button id="eraserBtn" class="tool-btn" title="Eraser">Eraser</button>
+        <!-- ADDED: Text and Image buttons -->
+        <button id="textBtn" class="tool-btn" title="Text">Text</button>
+        <button id="imageBtn" class="tool-btn" title="Image">Image</button>
       </div>
 
       <div class="tool-group">
@@ -75,7 +78,7 @@
       
       <div class="tool-group tool-group-right">
         <label class="tool-label">Canvas</label>
-        <button id="clearBtn" class="tool-btn" title="Clear Canvas">Clear</button>
+        <button id="clearBtn" class="tool-btn" title="Clear My Drawings">Clear</button>
         <button id="saveBtn" class="tool-btn" title="Save Image">Save</button>
       </div>
     </div>
@@ -87,6 +90,7 @@
         <div class="canvas-area">
           <canvas id="baseCanvas"></canvas>
           <canvas id="overlayCanvas"></canvas>
+          <!-- Text inputs will be dynamically added here -->
         </div>
       </div>
 
@@ -99,6 +103,9 @@
       </aside>
     </main>
   </div>
+
+  <!-- ADDED: Hidden file input for image uploads -->
+  <input type="file" id="imageInput" accept="image/*" style="display: none;" />
 
   <script src="websocket.js"></script>
   <script src="canvas.js"></script>

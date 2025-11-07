@@ -1,7 +1,5 @@
 /*
   This CSS file controls the scalable (responsive) layout.
-  See the "--- Responsive ---" section at the bottom for
-  the @media queries that handle different screen sizes.
 */
 
 :root {
@@ -279,17 +277,16 @@ input[type="color"]::-webkit-color-swatch {
   overflow: hidden; /* Hide canvas corners */
 }
 .canvas-area {
-  position: relative;
+  position: relative; /* Changed for positioning text input */
   width: 100%;
   height: 100%;
   flex-grow: 1; /* Let canvas area fill panel */
   background-color: #ffffff;
   border-bottom-left-radius: 0.5rem;
   border-bottom-right-radius: 0.5rem;
-  margin-top: -1rem; /* Pull up to cover panel-title's margin */
 }
 
-/* This is the title *overlaying* the canvas */
+/* This title was removed from index.html */
 #canvas-panel .panel-title {
   position: absolute;
   top: 0;
@@ -317,6 +314,29 @@ input[type="color"]::-webkit-color-swatch {
 #overlayCanvas {
   pointer-events: none;
 }
+
+/* MODIFIED: Style for the dynamic text input (now textarea) */
+.text-input-overlay {
+  position: absolute;
+  z-index: 100;
+  /* ADDED: Plain white background and dark text */
+  background: #ffffff;
+  color: #0d1a2b;
+  border: 2px solid var(--cyan-border); /* Made border more visible */
+  border-radius: 0.25rem;
+  padding: 4px 6px;
+  font-family: var(--font-sans);
+  outline: none;
+  box-shadow: 0 0 10px var(--cyan-glow);
+  transform-origin: top left; /* Ensures scaling from the corner */
+  
+  /* ADDED: Textarea specific styles */
+  resize: none; /* User cannot resize, it's set by drag */
+  white-space: pre-wrap; /* Respect newlines */
+  word-wrap: break-word; /* Wrap long words */
+  overflow: auto; /* Show scrollbar if text overflows */
+}
+
 
 /* --- Users Panel --- */
 #users-panel {
@@ -366,9 +386,7 @@ input[type="color"]::-webkit-color-swatch {
   to { opacity: 0; transform: translateX(-10px); }
 }
 
-/* --- Responsive ---
-  This is the "scalable" part!
-*/
+/* --- Responsive --- */
 @media (max-width: 1024px) {
   /* For tablets */
   .dashboard-container {
