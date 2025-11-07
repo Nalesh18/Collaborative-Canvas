@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Collaborative Canvas Dashboard</title>
+  
+  <!-- Add the futuristic font 'Exo 2' from the dashboard example -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 
+    RE-STYLED: Login Modal now matches the dark/cyan theme
+  -->
+  <div id="loginModal" class="modal">
+    <div class="modal-card panel">
+      <h2 class="panel-title">Join Canvas Session</h2>
+      <div class="modal-content">
+        <label for="usernameInput">Display Name</label>
+        <input id="usernameInput" type="text" placeholder="Enter name" />
+        <label for="userColorInput">Select Color</label>
+        <div class="modal-actions">
+          <input id="userColorInput" type="color" value="#00cfff" />
+          <button id="joinBtn" class="tool-btn active">Join</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 
+    RE-STRUCTURED: The app is now a single dashboard.
+    The header contains the title.
+    The toolbar is the main control panel.
+    The main-grid holds the canvas and user list.
+  -->
+  <div class="dashboard-container">
+    <header class="dashboard-header">
+      <h1 class="dashboard-title">COLLABORATIVE CANVAS</h1>
+      <div class="dashboard-stats">
+          <div>FPS: <span id="fps">—</span></div>
+          <div id="latency">Ping: — ms</div>
+      </div>
+    </header>
+
+    <!-- Toolbar Panel -->
+    <div class="panel toolbar">
+      <div class="tool-group">
+        <label class="tool-label">Tools</label>
+        <button id="brushBtn" class="tool-btn active" title="Brush">Brush</button>
+        <button id="eraserBtn" class="tool-btn" title="Eraser">Eraser</button>
+      </div>
+
+      <div class="tool-group">
+        <label class="tool-label">Shapes</label>
+        <button id="rectBtn" class="tool-btn" title="Rectangle">Rect</button>
+        <button id="circleBtn" class="tool-btn" title="Circle">Circle</button>
+        <button id="lineBtn" class="tool-btn" title="Line">Line</button>
+      </div>
+      
+      <div class="tool-group">
+        <label class="tool-label">History</label>
+        <button id="undoBtn" class="tool-btn" title="Undo">Undo</button>
+        <button id="redoBtn" class="tool-btn" title="Redo">Redo</button>
+      </div>
+
+      <div class="tool-group">
+        <label class="tool-label">Brush</label>
+        <input id="size" type="range" min="1" max="48" value="4" title="Brush Size" />
+        <input id="colorPicker" type="color" value="#00cfff" title="Color Picker" />
+      </div>
+      
+      <div class="tool-group tool-group-right">
+        <label class="tool-label">Canvas</label>
+        <button id="clearBtn" class="tool-btn" title="Clear Canvas">Clear</button>
+        <button id="saveBtn" class="tool-btn" title="Save Image">Save</button>
+      </div>
+    </div>
+
+    <!-- Main Content Grid -->
+    <main class="main-grid">
+      <!-- Canvas Panel -->
+      <div id="canvas-panel" class="panel">
+        <h2 class="panel-title">LIVE CANVAS (SHARED)</h2>
+        <div class="canvas-area">
+          <canvas id="baseCanvas"></canvas>
+          <canvas id="overlayCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Users Panel -->
+      <aside id="users-panel" class="panel">
+        <h2 class="panel-title">SESSION USERS</h2>
+        <ul id="usersList" class="users-list">
+          <!-- Users will be added here by JS -->
+        </ul>
+      </aside>
+    </main>
+  </div>
+
+  <script src="websocket.js"></script>
+  <script src="canvas.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
