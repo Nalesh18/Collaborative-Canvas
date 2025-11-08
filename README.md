@@ -147,7 +147,7 @@ Share the generated **public URL** to connect from different devices.
 * Try:
 
   * Drawing simultaneously on both screens.
-  * Using different tools (brush, eraser, shapes).
+  * Using different tools.
   * Performing **undo/redo** and verifying synchronization.
   * Observing **cursor indicators** for other users.
 
@@ -155,7 +155,7 @@ Share the generated **public URL** to connect from different devices.
 
 ## ⚙️ Known Limitations
 
-* No persistent storage (drawings reset on server restart).
+* No persistent storage.
 * Global undo/redo can occasionally desync during rapid events.
 * Touch support for mobile devices is experimental.
 
@@ -163,7 +163,7 @@ Share the generated **public URL** to connect from different devices.
 
 ## 📘 Time Spent
 
-Approx. **3 days** (including testing, optimization, and deployment).
+Approx. **4 days** (including testing, integration, and deployment).
 
 ---
 
@@ -176,7 +176,9 @@ This project is open-source under the **MIT License**.
 ## 👤 Author
 
 **Developed by:** Nalesh Kumar B
+
 **GitHub:** @Nalesh18
+
 **Email:** nalesh.nk18@gmail.com
 
 ---
