@@ -15,10 +15,10 @@ Collaborative Canvas is a real-time web-based application that allows multiple u
 The system follows a **client-server architecture** using **WebSockets** for bi-directional communication.
 
 ```
- ┌──────────────────┐        WebSocket        ┌──────────────────┐
+ ┌──────────────────┐        WebSocket       ┌───────────────────┐
  │    Client A      │ <--------------------> │     Node.js       │
  │ (Canvas + JS)    │                        │   (ws + express)  │
- └──────────────────┘                        └──────────────────┘
+ └──────────────────┘                        └───────────────────┘
            ▲                                           ▲
            │                                           │
            │                                           │
@@ -166,12 +166,12 @@ Then open `http://localhost:3000` in multiple browser tabs to test real-time syn
 
 2. Deploy using Render:
 
-   * Go to [https://render.com](https://render.com)
-   * Click **New Web Service**
-   * Connect your GitHub repo
-   * Set **Build Command:** `npm install`
-   * Set **Start Command:** `node server/server.js`
-   * Click **Deploy**
+   * Visit [Railway.app](https://railway.app).
+   * Create a new project → Deploy from GitHub.
+   * Configure environment:
+
+         * No database required.
+   * Deploy — it will automatically assign a live domain.
 
 3. Once deployed, open the live URL in two browsers to verify global sync.
 
@@ -196,5 +196,5 @@ Then open `http://localhost:3000` in multiple browser tabs to test real-time syn
 
 ---
 
-**Author:** Nalesh
+**Author:** Nalesh Kumar B
 **Repository:** [Collaborative-Canvas](https://github.com/Nalesh18/Collaborative-Canvas)
