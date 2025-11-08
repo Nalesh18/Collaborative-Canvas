@@ -3,7 +3,6 @@ const http = require('http');
 const path = require('path');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
-// Assuming rooms.js is in the same directory
 const { RoomManager } = require('./rooms'); 
 
 const rooms = new RoomManager();
@@ -160,6 +159,23 @@ wss.on('connection', (ws) => {
     // MODIFIED: Check if user was in a room before broadcasting
     if (meta && meta.room) {
       console.log(`Client ${meta.id} disconnected from room ${meta.room}`);
+
+      // --- ADDED: Automatically clear user's drawings on disconnect ---
+      // Create a 'clear-user' operation for the disconnected user
+      const clearOp = { 
+        id: uuidv4(), // Generate a new unique ID for this operation
+        type: 'clear-user', 
+        userId: meta.id, // The user who "sent" this op (the disconnected one)
+        payload: { userId: meta.id } // The user whose drawings to clear
+      };
+      
+      // Add this operation to the room's history
+      rooms.pushOp(meta.room, clearOp);
+      
+      // Broadcast this clear operation to all remaining clients in the room
+      broadcast(meta.room, 'op', clearOp);
+      // --- END OF ADDED LOGIC ---
+
       // MODIFIED: Remove presence from the correct room
       rooms.removePresence(meta.room, meta.id);
       // MODIFIED: Broadcast presence update only to that room
